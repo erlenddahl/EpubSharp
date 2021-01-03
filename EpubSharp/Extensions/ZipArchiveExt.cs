@@ -108,6 +108,23 @@ namespace EpubSharp
         {
             var entry = archive.GetEntryImproved(entryName);
 
+            // Ugly hack to allow reading XML 1.1 documents (as long as they don't actually use any 1.1 features).
+            using (var stream = entry.Open())
+            using (var reader = new StreamReader(stream))
+            {
+                // Read the first line, which usually contains the XML version.
+                var version = reader.ReadLine() ?? "";
+                
+                // If it's version 1.1 ...
+                if (version.Contains("version=\"1.1\""))
+                {
+                    // Replace the version with 1.0, and read the rest of the document.
+                    var xml = LoadXDocumentWithoutDtd(version.Replace("version=\"1.1\"", "version=\"1.0\"") + reader.ReadToEnd());
+                    return xml;
+                }
+            }
+
+            // Otherwise, for normal XML documents, read it directly.
             using (var stream = entry.Open())
             {
                 var xml = LoadXDocumentWithoutDtd(stream);

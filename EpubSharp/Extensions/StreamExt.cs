@@ -3,7 +3,7 @@ using System.IO;
 
 namespace EpubSharp
 {
-    internal static class StreamExt
+    public static class StreamExt
     {
         public static byte[] ReadToEnd(this Stream stream)
         {
