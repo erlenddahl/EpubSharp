@@ -69,6 +69,7 @@ namespace EpubSharp
                 book.SpecialResources = LoadSpecialResources(archive, book);
                 book.CoverImage = LoadCoverImage(book);
                 book.TableOfContents = LoadChapters(book);
+                book.FileSize = stream.Length;
                 return book;
             }
         }

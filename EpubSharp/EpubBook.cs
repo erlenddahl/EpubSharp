@@ -31,6 +31,7 @@ namespace EpubSharp
         public byte[] CoverImage { get; internal set; }
 
         public IList<EpubChapter> TableOfContents { get; internal set; }
+        public long FileSize { get; set; }
 
         public string ToPlainText()
         {
