@@ -31,7 +31,7 @@ namespace EpubSharp
             return Read(new MemoryStream(epubData), false, encoding);
         }
 
-        public static EpubBook Read(Stream stream, bool leaveOpen, Encoding encoding = null)
+        public static EpubBook Read(Stream stream, bool leaveOpen, Encoding encoding = null, bool metaDataOnly = false)
         {
             if (stream == null) throw new ArgumentNullException(nameof(stream));
             if (encoding == null) encoding = Constants.DefaultEncoding;
@@ -50,6 +50,9 @@ namespace EpubSharp
 
                 format.Opf = OpfReader.Read(archive.LoadXml(format.Paths.OpfAbsolutePath));
 
+                if (metaDataOnly)
+                    return new EpubBook {Format = format};
+
                 var navPath = format.Opf.FindNavPath();
                 if (navPath != null)
                 {
@@ -67,14 +70,16 @@ namespace EpubSharp
                 var book = new EpubBook { Format = format };
                 book.Resources = LoadResources(archive, book);
                 book.SpecialResources = LoadSpecialResources(archive, book);
+
                 book.CoverImage = LoadCoverImage(book);
+
                 book.TableOfContents = LoadChapters(book);
                 book.FileSize = stream.Length;
                 return book;
             }
         }
 
-        private static byte[] LoadCoverImage(EpubBook book)
+        private static EpubByteFile LoadCoverImage(EpubBook book)
         {
             if (book == null) throw new ArgumentNullException(nameof(book));
             if (book.Format == null) throw new ArgumentNullException(nameof(book.Format));
@@ -86,7 +91,7 @@ namespace EpubSharp
             }
 
             var coverImageFile = book.Resources.Images.SingleOrDefault(e => e.Href == coverPath);
-            return coverImageFile?.Content;
+            return coverImageFile;
         }
 
         private static List<EpubChapter> LoadChapters(EpubBook book)

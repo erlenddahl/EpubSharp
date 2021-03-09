@@ -28,7 +28,7 @@ namespace EpubSharp
         /// </summary>
         public EpubSpecialResources SpecialResources { get; internal set; }
 
-        public byte[] CoverImage { get; internal set; }
+        public EpubByteFile CoverImage { get; internal set; }
 
         public IList<EpubChapter> TableOfContents { get; internal set; }
         public long FileSize { get; set; }
