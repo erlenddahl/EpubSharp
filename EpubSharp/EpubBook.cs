@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using EpubSharp.Format;
@@ -43,6 +44,17 @@ namespace EpubSharp
             }
             return builder.ToString().Trim();
         }
+
+        private List<Exception> _readErrors;
+
+        public void AddReadError(Exception error)
+        {
+            if (_readErrors == null) _readErrors = new List<Exception>();
+            _readErrors.Add(error);
+        }
+
+        public bool HasReadErrors => _readErrors != null && _readErrors.Count > 0;
+        public IEnumerable<Exception> ReadErrors => _readErrors;
     }
 
     public class EpubChapter
