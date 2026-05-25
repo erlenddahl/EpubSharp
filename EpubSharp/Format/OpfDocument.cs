@@ -58,7 +58,7 @@ namespace EpubSharp.Format
         public OpfSpine Spine { get; internal set; } = new OpfSpine();
         public OpfGuide Guide { get; internal set; } = new OpfGuide();
 
-        internal string FindCoverPath()
+        internal string FindCoverPathO()
         {
             var coverMetaItem = Metadata.FindCoverMeta();
             if (coverMetaItem != null)
@@ -67,6 +67,29 @@ namespace EpubSharp.Format
                 if (item != null)
                 {
                     return item.Href;
+                }
+            }
+
+            var coverItem = Manifest.FindCoverItem();
+            return coverItem?.Href;
+        }
+
+        internal string FindCoverPath()
+        {
+            var coverMetaItem = Metadata.FindCoverMeta();
+            if (coverMetaItem != null)
+            {
+                var coverId = !string.IsNullOrWhiteSpace(coverMetaItem.Content)
+                    ? coverMetaItem.Content
+                    : coverMetaItem.Text;
+
+                if (!string.IsNullOrWhiteSpace(coverId))
+                {
+                    var item = Manifest.Items.FirstOrDefault(e => e.Id == coverId);
+                    if (item != null)
+                    {
+                        return item.Href;
+                    }
                 }
             }
 
@@ -114,6 +137,39 @@ namespace EpubSharp.Format
         {
             var navItem = Manifest.Items.FirstOrDefault(e => e.Properties.Contains("nav"));
             return navItem?.Href;
+        }
+
+        internal string FindCoverPagePath()
+        {
+            // EPUB 2 guide. Standard type is "cover" or "cover-page".
+            var guideCover = Guide?.References?.FirstOrDefault(reference =>
+                string.Equals(reference.Type, "cover", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(reference.Type, "cover-page", StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrWhiteSpace(guideCover?.Href))
+            {
+                return guideCover.Href;
+            }
+
+            // Fallback: first spine item whose manifest id/href suggests cover.
+            var firstSpineItem = Spine?.ItemRefs?.FirstOrDefault();
+
+            if (firstSpineItem != null)
+            {
+                var manifestItem = Manifest.Items.FirstOrDefault(item => item.Id == firstSpineItem.IdRef);
+
+                if (manifestItem != null &&
+                    manifestItem.MediaType == "application/xhtml+xml" &&
+                    (
+                        manifestItem.Id?.IndexOf("cover", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        manifestItem.Href?.IndexOf("cover", StringComparison.OrdinalIgnoreCase) >= 0
+                    ))
+                {
+                    return manifestItem.Href;
+                }
+            }
+
+            return null;
         }
     }
 
@@ -209,6 +265,7 @@ namespace EpubSharp.Format
         public string Id { get; internal set; }
         public string Refines { get; internal set; }
         public string Property { get; internal set; }
+        public string Content { get; internal set; }
         public string Scheme { get; internal set; }
         public string Text { get; internal set; }
     }
@@ -221,7 +278,8 @@ namespace EpubSharp.Format
 
         internal OpfManifestItem FindCoverItem()
         {
-            return Items.FirstOrDefault(e => e.Properties.Contains(ManifestItemCoverImageProperty));
+            return Items.FirstOrDefault(e => e.Properties.Contains(ManifestItemCoverImageProperty))
+                ?? Items.FirstOrDefault(p => p.Id == "xhtml_cover");
         }
 
         internal void DeleteCoverItem(string id = null)

@@ -50,12 +50,15 @@ namespace EpubSharp.Format.Readers
                     Languages = metadata?.Elements(OpfElements.Language).AsStringList(),
                     Metas = metadata?.Elements(OpfElements.Meta).AsObjectList(elem => new OpfMetadataMeta
                     {
-                        Id = (string) elem.Attribute(OpfMetadataMeta.Attributes.Id),
-                        Name = (string) elem.Attribute(OpfMetadataMeta.Attributes.Name),
-                        Refines = (string) elem.Attribute(OpfMetadataMeta.Attributes.Refines),
-                        Scheme = (string) elem.Attribute(OpfMetadataMeta.Attributes.Scheme),
-                        Property = (string) elem.Attribute(OpfMetadataMeta.Attributes.Property),
-                        Text = epubVersion == EpubVersion.Epub2 ? (string) elem.Attribute(OpfMetadataMeta.Attributes.Content) : elem.Value
+                        Id = (string)elem.Attribute(OpfMetadataMeta.Attributes.Id),
+                        Name = (string)elem.Attribute(OpfMetadataMeta.Attributes.Name),
+                        Refines = (string)elem.Attribute(OpfMetadataMeta.Attributes.Refines),
+                        Scheme = (string)elem.Attribute(OpfMetadataMeta.Attributes.Scheme),
+                        Property = (string)elem.Attribute(OpfMetadataMeta.Attributes.Property),
+                        Content = (string)elem.Attribute(OpfMetadataMeta.Attributes.Content),
+                        Text = epubVersion == EpubVersion.Epub2
+                            ? (string)elem.Attribute(OpfMetadataMeta.Attributes.Content)
+                            : elem.Value
                     }),
                     Publishers = metadata?.Elements(OpfElements.Publisher).AsStringList(),
                     Relations = metadata?.Elements(OpfElements.Relation).AsStringList(),

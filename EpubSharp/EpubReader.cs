@@ -84,14 +84,154 @@ namespace EpubSharp
             if (book == null) throw new ArgumentNullException(nameof(book));
             if (book.Format == null) throw new ArgumentNullException(nameof(book.Format));
 
+            // Direct image cover via meta name="cover"
+            // or EPUB 3 properties="cover-image".
             var coverPath = book.Format.Opf.FindCoverPath();
-            if (coverPath == null)
+
+            if (!string.IsNullOrWhiteSpace(coverPath))
+            {
+                var directCoverImage = book.Resources.Images
+                    .SingleOrDefault(e => e.Href == coverPath);
+
+                if (directCoverImage != null)
+                {
+                    return directCoverImage;
+                }
+            }
+
+            // Fallback if above properties are missing, and cover is an XHTML/SVG page.
+            var fileFromCoverPage = FindCoverImageFromCoverPage(book);
+            if (fileFromCoverPage != null) return fileFromCoverPage;
+
+            // Or if any of the first spine items is a cover page
+            var fileFromFirstSpineImagePage = FindCoverFromFirstSpineImagePage(book);
+            if (fileFromFirstSpineImagePage != null) return fileFromFirstSpineImagePage;
+
+            // Final fallback: just look for an image with "cover" in the filename
+            return book.Resources.Images.FirstOrDefault(p => p.AbsolutePath.ToLower().Contains("cover") || p.Href.ToLower().Contains("cover"))
+                   ?? book.Resources.Images.OrderBy(p => p.AbsolutePath).FirstOrDefault();
+        }
+
+        private static EpubByteFile FindCoverFromFirstSpineImagePage(EpubBook book)
+        {
+            var firstSpineItems = book.Format.Opf.Spine.ItemRefs.Take(3);
+
+            foreach (var spineItem in firstSpineItems)
+            {
+                var manifestItem = book.Format.Opf.Manifest.Items.FirstOrDefault(item => item.Id == spineItem.IdRef);
+
+                if (manifestItem?.MediaType != "application/xhtml+xml") continue;
+
+                var htmlFile = book.Resources.Html.FirstOrDefault(file => file.Href == manifestItem.Href);
+                if (htmlFile?.Content == null) continue;
+
+                var imageHref = FindFirstImageHrefInHtml(htmlFile.TextContent);
+
+                if (string.IsNullOrWhiteSpace(imageHref)) continue;
+
+                var htmlAbsolutePath = manifestItem.Href.ToAbsolutePath(book.Format.Paths.OpfAbsolutePath);
+                var imageAbsolutePath = imageHref.ToAbsolutePath(htmlAbsolutePath);
+
+                var imageFile = book.Resources.Images.FirstOrDefault(file => file.AbsolutePath == imageAbsolutePath);
+
+                if (imageFile != null && LooksLikeCoverImagePage(htmlFile.TextContent))
+                {
+                    return imageFile;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool LooksLikeCoverImagePage(string html)
+        {
+            try
+            {
+                var document = XDocument.Parse(html);
+
+                XNamespace xhtml = "http://www.w3.org/1999/xhtml";
+                XNamespace svg = "http://www.w3.org/2000/svg";
+
+                var imageCount =
+                    document.Descendants(xhtml + "img").Count() +
+                    document.Descendants(svg + "image").Count();
+
+                var text = string.Concat(
+                    document
+                        .DescendantNodes()
+                        .OfType<XText>()
+                        .Select(textNode => textNode.Value)
+                ).Trim();
+
+                return imageCount == 1 && text.Length < 100;
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+        }
+
+        private static EpubByteFile FindCoverImageFromCoverPage(EpubBook book)
+        {
+            var coverPageHref = book.Format.Opf.FindCoverPagePath();
+
+            if (string.IsNullOrWhiteSpace(coverPageHref)) return null;
+
+            var coverPage = book.Resources.Html.SingleOrDefault(e => e.Href == coverPageHref);
+            if (coverPage?.Content != null)
+            {
+                var imageHref = FindFirstImageHrefInHtml(coverPage.TextContent);
+
+                if (string.IsNullOrWhiteSpace(imageHref)) return null;
+
+                var coverPageAbsolutePath = coverPageHref.ToAbsolutePath(book.Format.Paths.OpfAbsolutePath);
+                var imageAbsolutePath = imageHref.ToAbsolutePath(coverPageAbsolutePath);
+                var coverImageFile = book.Resources.Images.SingleOrDefault(e => e.AbsolutePath == imageAbsolutePath);
+
+                return coverImageFile;
+            }
+
+            return null;
+        }
+
+        private static string FindFirstImageHrefInHtml(string html)
+        {
+            try
+            {
+                var document = XDocument.Parse(html);
+
+                XNamespace xhtml = "http://www.w3.org/1999/xhtml";
+                XNamespace svg = "http://www.w3.org/2000/svg";
+                XNamespace xlink = "http://www.w3.org/1999/xlink";
+
+                var img = document
+                    .Descendants(xhtml + "img")
+                    .FirstOrDefault(e => e.Attribute("src") != null);
+
+                if (img != null)
+                {
+                    return (string)img.Attribute("src");
+                }
+
+                var svgImage = document
+                    .Descendants(svg + "image")
+                    .FirstOrDefault(e =>
+                        e.Attribute("href") != null ||
+                        e.Attribute(xlink + "href") != null);
+
+                if (svgImage != null)
+                {
+                    return
+                        (string)svgImage.Attribute("href") ??
+                        (string)svgImage.Attribute(xlink + "href");
+                }
+            }
+            catch (Exception ex)
             {
                 return null;
             }
 
-            var coverImageFile = book.Resources.Images.SingleOrDefault(e => e.Href == coverPath);
-            return coverImageFile;
+            return null;
         }
 
         private static List<EpubChapter> LoadChapters(EpubBook book)
