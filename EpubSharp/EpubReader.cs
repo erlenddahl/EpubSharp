@@ -209,7 +209,58 @@ namespace EpubSharp
             foreach (var item in book.Format.Opf.Manifest.Items)
             {
                 var path = item.Href.ToAbsolutePath(book.Format.Paths.OpfAbsolutePath);
-                var entry = epubArchive.GetEntryImproved(path);
+                ZipArchiveEntry entry = null;
+
+                var href = item.Href;
+                var mimeType = item.MediaType;
+
+                EpubContentType contentType;
+                contentType = ContentType.MimeTypeToContentType.TryGetValue(mimeType, out contentType)
+                    ? contentType
+                    : EpubContentType.Other;
+
+                void AddTextFile(byte[] contents)
+                {
+                    var file = new EpubTextFile
+                    {
+                        AbsolutePath = path,
+                        Href = href,
+                        MimeType = mimeType,
+                        ContentType = contentType,
+                        Content = contents
+                    };
+
+                    resources.All.Add(file);
+
+                    switch (contentType)
+                    {
+                        case EpubContentType.Xhtml11:
+                            resources.Html.Add(file);
+                            break;
+                        case EpubContentType.Css:
+                            resources.Css.Add(file);
+                            break;
+                        default:
+                            resources.Other.Add(file);
+                            break;
+                    }
+                }
+
+                try
+                {
+                    entry = epubArchive.GetEntryImproved(path);
+                }
+                catch (EpubParseException epex)
+                {
+                    // Add "placeholders" for missing files. This solves an issue with some (Epub 2?) book files
+                    // that references a file that does not exist in the archive (_page_map_.xml).
+                    AddTextFile(Encoding.UTF8.GetBytes("Failed to load file: " + epex.Message));
+
+                    book.AddReadError(epex);
+
+                    // Then move on to the next entry.
+                    continue;
+                }
 
                 if (entry == null)
                 {
@@ -219,14 +270,6 @@ namespace EpubSharp
                 {
                     throw new EpubParseException($"file {path} is bigger than 2 Gb.");
                 }
-
-                var href = item.Href;
-                var mimeType = item.MediaType;
-
-                EpubContentType contentType;
-                contentType = ContentType.MimeTypeToContentType.TryGetValue(mimeType, out contentType)
-                    ? contentType
-                    : EpubContentType.Other;
 
                 switch (contentType)
                 {
@@ -238,32 +281,9 @@ namespace EpubSharp
                     case EpubContentType.Dtbook:
                     case EpubContentType.DtbookNcx:
                         {
-                            var file = new EpubTextFile
-                            {
-                                AbsolutePath = path,
-                                Href = href,
-                                MimeType = mimeType,
-                                ContentType = contentType
-                            };
-
-                            resources.All.Add(file);
-
                             using (var stream = entry.Open())
                             {
-                                file.Content = stream.ReadToEnd();
-                            }
-
-                            switch (contentType)
-                            {
-                                case EpubContentType.Xhtml11:
-                                    resources.Html.Add(file);
-                                    break;
-                                case EpubContentType.Css:
-                                    resources.Css.Add(file);
-                                    break;
-                                default:
-                                    resources.Other.Add(file);
-                                    break;
+                                AddTextFile(stream.ReadToEnd());
                             }
                             break;
                         }
