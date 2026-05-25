@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Xml.Linq;
 
 namespace EpubSharp.Format.Readers
@@ -68,15 +69,35 @@ namespace EpubSharp.Format.Readers
             if (element == null) throw new ArgumentNullException(nameof(element));
             if (element.Name != NcxElements.NavPoint) throw new ArgumentException("The element is not <navPoint>", nameof(element));
 
+            var playOrder = ParsePlayOrder((string)element.Attribute(NcxNavPoint.Attributes.PlayOrder));
+
             return new NcxNavPoint
             {
                 Id = (string)element.Attribute(NcxNavPoint.Attributes.Id),
                 Class = (string)element.Attribute(NcxNavPoint.Attributes.Class),
                 NavLabelText = element.Element(NcxElements.NavLabel)?.Element(NcxElements.Text)?.Value,
                 ContentSrc = (string)element.Element(NcxElements.Content)?.Attribute(NcxNavPoint.Attributes.ContentSrc),
-                PlayOrder = (int?)element.Attribute(NcxNavPoint.Attributes.PlayOrder),
+                PlayOrder = playOrder,
                 NavPoints = element.Elements(NcxElements.NavPoint).AsObjectList(ReadNavPoint)
             };
+        }
+
+        private static int? ParsePlayOrder(string playOrder)
+        {
+            // First, try to parse it as a normal numeric string
+            if (int.TryParse(playOrder, out var parsed))
+            {
+                return parsed;
+            }
+
+            // If that didn't work, try to parse it as hex instead
+            if (int.TryParse(playOrder, System.Globalization.NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var parsedHex))
+            {
+                return parsedHex;
+            }
+
+            // If nothing works, return null.
+            return null;
         }
     }
 }
