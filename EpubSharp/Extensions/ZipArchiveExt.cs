@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -145,8 +146,16 @@ namespace EpubSharp
         /// <returns></returns>
         private static XDocument LoadXDocumentWithoutDtd(string xml)
         {
-            using (var stream = new MemoryStream(Constants.DefaultEncoding.GetBytes(xml)))
-                return LoadXDocumentWithoutDtd(stream);
+            try
+            {
+                using (var stream = new MemoryStream(Constants.DefaultEncoding.GetBytes(xml)))
+                    return LoadXDocumentWithoutDtd(stream);
+
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Failed to read this book. This may indicate that the book file is corrupt, or that it is locked with DRM, which must be removed in order to read it.", ex);
+            }
         }
 
         /// <summary>
